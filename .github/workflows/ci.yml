@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+
+  build:
+    strategy:
+      matrix:
+        #See https://gist.github.com/lizkes/975ab2d1b5f9d5fdee5d3fa665bcfde6
+        goarch: [amd64]
+        goos: [linux]
+    uses: ./.github/workflows/_build.yml
+    with:
+      goarch: ${{ matrix.goarch }}
+      goos: ${{ matrix.goos }}
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
+      - name: Run test
+        run: go test -race ./...
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
+      - name: Run coverage
+        run: go test -coverprofile=coverage.out -covermode=atomic ./...
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
+      - uses: actions/checkout@v3
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+
+  check-mod:
+    name: Check go.mod and go.sum
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
+      - uses: actions/checkout@v3
+      - name: Tidy go module
+        run: go mod tidy
+      - name: Assert that there is no diff
+        run: "[ $(git status --porcelain=v1 --untracked-files=no | wc -l) -eq 0 ]"
